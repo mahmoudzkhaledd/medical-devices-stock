@@ -1,0 +1,202 @@
+generator client {
+  provider = "prisma-client"
+  output   = "./generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────
+// Authentication
+// ─────────────────────────────────────────────
+
+model User {
+  id              String    @id @default(cuid())
+  name            String
+  email           String    @unique
+  emailVerified   Boolean   @default(false)
+  image           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  role            String    @default("USER")
+  banned          Boolean?  @default(false)
+  banReason       String?
+  banExpires      DateTime?
+  username        String?   @unique
+  displayUsername String?
+
+  accounts     Account[]
+  transactions Transaction[] @relation("PerformedTransactions")
+
+  @@map("user")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+enum TrackingMode {
+  SERIALIZED
+  QUANTITY
+}
+
+enum DeviceStatus {
+  ACTIVE
+  OUT_OF_SERVICE
+  DISPOSED
+}
+
+enum TransactionType {
+  TRANSFER
+  DISPOSAL
+}
+
+model Manufacturer {
+  id          String        @id @default(cuid())
+  name        String        @unique
+  imageUrl    String?
+  notes       String        @default("")
+  modelsCount Int           @default(0)
+  unitsCount  Int           @default(0)
+  models      DeviceModel[]
+  createdAt   DateTime      @default(now())
+  deviceTypes DeviceType[]
+}
+
+model DeviceType {
+  id             String        @id @default(cuid())
+  name           String        @unique
+  manufacturer   Manufacturer  @relation(fields: [manufacturerId], references: [id])
+  manufacturerId String
+  createdAt      DateTime      @default(now())
+  models         DeviceModel[]
+
+  @@index([manufacturerId])
+}
+
+model DeviceModel {
+  id             String       @id @default(cuid())
+  name           String
+  trackingMode   TrackingMode
+  manufacturerId String
+  typeId         String
+
+  manufacturer Manufacturer @relation(fields: [manufacturerId], references: [id])
+  type         DeviceType   @relation(fields: [typeId], references: [id])
+
+  devicesCount Int @default(0)
+
+  devices          Device[]
+  departmentStocks DepartmentStock[]
+  createdAt        DateTime          @default(now())
+
+  @@unique([manufacturerId, typeId, name])
+  @@index([manufacturerId])
+  @@index([typeId])
+}
+
+model Department {
+  id               String            @id @default(cuid())
+  name             String            @unique
+  devices          Device[]
+  departmentStocks DepartmentStock[]
+  devicesCount     Int               @default(0)
+  createdAt        DateTime          @default(now())
+}
+
+model Device {
+  id           String       @id @default(cuid())
+  serialNumber String?      @unique
+  quantity     Int          @default(1)
+  status       DeviceStatus @default(ACTIVE)
+
+  modelId      String
+  departmentId String
+
+  model      DeviceModel @relation(fields: [modelId], references: [id])
+  department Department  @relation(fields: [departmentId], references: [id])
+
+  accessories Device[] @relation("device-accessories")
+
+  transactionItems TransactionItem[]
+  supplier         Supplier          @relation(fields: [supplierId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  parentDevice   Device? @relation("device-accessories", fields: [parentDeviceId], references: [id])
+  parentDeviceId String?
+  supplierId     String
+
+  @@index([modelId, departmentId])
+  @@index([departmentId, status])
+  @@index([supplierId])
+}
+
+model Supplier {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  deletedAt DateTime?
+  devices   Device[]
+  createdAt DateTime  @default(now())
+}
+
+model Transaction {
+  id   String          @id @default(cuid())
+  type TransactionType
+  date DateTime        @default(now())
+
+  items  TransactionItem[]
+  user   User              @relation("PerformedTransactions", fields: [userId], references: [id])
+  userId String
+
+  @@index([type, date])
+  @@index([userId])
+}
+
+model TransactionItem {
+  id            String @id @default(cuid())
+  transactionId String
+  deviceId      String
+  quantity      Int    @default(1)
+
+  fromDepartmentId String?
+  toDepartmentId   String?
+
+  transaction Transaction @relation(fields: [transactionId], references: [id])
+
+  device Device @relation(fields: [deviceId], references: [id])
+
+  @@index([transactionId])
+  @@index([deviceId])
+}
+
+model DepartmentStock {
+  id           String @id @default(cuid())
+  modelId      String
+  departmentId String
+  quantity     Int    @default(0)
+
+  model      DeviceModel @relation(fields: [modelId], references: [id])
+  department Department  @relation(fields: [departmentId], references: [id])
+
+  @@unique([modelId, departmentId])
+  @@index([departmentId])
+}
