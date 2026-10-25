@@ -25,7 +25,7 @@ export default function Home() {
               className="gap-1.5 px-2.5 py-0.5 text-xs font-normal"
             >
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-              Enterprise Platform
+              Enterprise Platform.
             </Badge>
           </div>
           <CardTitle className="text-foreground text-2xl font-bold tracking-tight sm:text-3xl">
